@@ -9,3 +9,5 @@ utils
 macros.ini_initial
 startup_css.c
 target_config.ccxml
+debug.h
+enet_weather_ccs.cmd
