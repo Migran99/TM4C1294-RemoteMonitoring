@@ -1,0 +1,11 @@
+.launches
+.settings
+Debug
+drivers
+utils
+.ccsproject
+.cproject
+.project
+macros.ini_initial
+startup_css.c
+target_config.ccxml
