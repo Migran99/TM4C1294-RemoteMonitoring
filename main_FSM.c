@@ -22,7 +22,8 @@
 #include "utils/uartstdio.h"
 #include "utils/ustdlib.h"
 #include "eth_client_lwip.h"
-#include "enet_weather.h"
+#include "main.h"
+#include "string.h"
 
 #define ETH_CLIENT_EVENT_DHCP          0x00000001
 #define ETH_CLIENT_EVENT_DISCONNECT    0x00000002
@@ -59,8 +60,14 @@ uint16_t puertoConexion = 80;
 int8_t g_exampleRequest[] =
         "GET /https://api.telegram.org/bot1435063235:AAHmzw5HcVKpZvCxf3kgwenqtsIXOHz167E/sendMessage?chat_id=@sepaGIERM&text=TIVAHEY HTTP/1.1\r\nHost: httptohttps.mrtimcakes.com\r\nConnection: close\r\n\r\n";
 
-//int8_t g_exampleRequest[] =
-//        "GET http://api.openweathermap.org/data/2.5/weather?q=London,uk&APPID=130f400d0d8e6254d282aec2e9cb4582 HTTP/1.0\r\n\r\n";
+const char* requestHeader = "GET /https://api.telegram.org/bot";
+char* APIkey = "1435063235:AAHmzw5HcVKpZvCxf3kgwenqtsIXOHz167E";
+const char* sendMessage = "sendMessage?chat_id=@";
+char* chatName = "sepaGIERM";
+const char* textHeader = "&text=";
+char* messageToSend;
+const char* endRequest =  "HTTP/1.1\r\nHost: httptohttps.mrtimcakes.com\r\nConnection: close\r\n\r\n";
+
 //*****************************************************************************
 
 //*****************************************************************************
@@ -235,14 +242,16 @@ int32_t telegramIP;
 int32_t i32Idx;
 //*****************
 
-//*****************************************************************************
-//
-// This example demonstrates the use of the Ethernet Controller.
-//
-//*****************************************************************************
+int makeRequest(char *text, char *finalRequest){
+    sprintf(finalRequest,"GET /https://api.telegram.org/bot%s/sendMessage?chat_id=@%s&text=%s HTTP/1.1\r\nHost: httptohttps.mrtimcakes.com\r\nConnection: close\r\n\r\n",APIkey,chatName,text);
+}
+
 int
 main(void)
 {
+
+    char myRequest[MAX_REQUEST_SIZE];
+    char *letter = "aver";
 
     SysCtlMOSCConfigSet(SYSCTL_MOSC_HIGHFREQ);
 
@@ -307,6 +316,9 @@ main(void)
 
     actualizarUART = 50;
 
+
+    messageToSend = "a";
+
     while(1)
     {
         if(g_iState == STATE_NEW_CONNECTION)
@@ -317,9 +329,11 @@ main(void)
         {
             g_ui32Delay = 1000; // 10 segundos
             g_iState = STATE_WAIT_DATA;
-        
-            resEnvio=EthClientSend(g_exampleRequest,sizeof(g_exampleRequest));
 
+            makeRequest(letter, myRequest);
+            resEnvio=EthClientSend(myRequest,sizeof(myRequest));
+            //letter++;
+            UARTprintf("\n%s",myRequest);
             //Debug
             if(!conexionTelegram)
                 UARTprintf("\n\n>Conexion TCP establecida");
