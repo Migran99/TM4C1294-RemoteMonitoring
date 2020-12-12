@@ -10,6 +10,7 @@
 #include "utils/ustdlib.h"
 #include "eth_client_lwip.h"
 #include <string.h>
+#include <stdio.h>
 #include "Sensor_HMI.h"
 
 
@@ -99,6 +100,11 @@ char g_pcIPAddr[20];
 uint16_t actualizarUART;
 uint32_t g_ui32UARTDelay;
 
+//Variables para el control temporal de la HMI
+int tAct=0,tCursor=0;
+bool actualizaHMI=1;
+
+
 void
 UpdateIPAddress(char *pcAddr, uint32_t ipAddr)
 {
@@ -169,6 +175,23 @@ SysTickIntHandler(void) // Cada 10 ms
     if(g_ui32Delay > 0)
     {
         g_ui32Delay--;
+    }
+
+    /*Activamos un refesco de la pantalla cada 100 ms*/
+    tAct++;
+    if(tAct > 10)
+    {
+        tAct=0;
+        actualizaHMI=1;
+    }
+
+
+    /*Hacemos que el cursor de la pantalla aparezca y desaparezca cada 0.5s*/
+    tCursor++;
+    if (tCursor > 50)
+    {
+        tCursor=0;
+        muestraCursor=!muestraCursor;
     }
 }
 
@@ -263,6 +286,7 @@ void makeRequest(char *text, char *finalRequest){
 int
 main(void)
 {
+
     SysCtlMOSCConfigSet(SYSCTL_MOSC_HIGHFREQ);
 
     g_ui32SysClock = MAP_SysCtlClockFreqSet((SYSCTL_XTAL_25MHZ |
@@ -270,8 +294,11 @@ main(void)
             SYSCTL_USE_PLL |
             SYSCTL_CFG_VCO_240), 120000000);
 
-    PinoutSet(true, false);
+    /*Configuramos el sensor y la pantalla*/
+    configuraSensor(g_ui32SysClock);
+    configuraPantalla(2,g_ui32SysClock);    //Pantalla en el BoosterPack 2
 
+    PinoutSet(true, false);
 
     // UART
     //
@@ -396,6 +423,14 @@ main(void)
         if(actualizarUART == 0){
             UARTprintf("\n\nESTADO: %s",stateName[g_iState]);
             actualizarUART = 50;
+        }
+
+        /*---Leemos los sensores y actualizamos la pantalla---*/
+        if (actualizaHMI)
+        {
+            actualizaHMI = 0;
+            leeSensores();
+            HMI();
         }
 
         SysCtlDelay(500);
