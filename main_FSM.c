@@ -9,7 +9,8 @@
 #include "utils/uartstdio.h"
 #include "utils/ustdlib.h"
 #include "eth_client_lwip.h"
-#include "string.h"
+#include <string.h>
+#include "Sensor_HMI.h"
 
 
 #define SYSTEM_TICK_MS          10
@@ -75,79 +76,29 @@ char textoRequest[200];
 // Sensores e informe
 const int numSensores = 4;
 
- bool configInforme[numSensores] = {true,true,true,true};
- float medidasSensores[numSensores] = {20.1, 385.7, 1024.1, 12.6};
- const char *infoSensores[]={"Temperatura","Luz","Presion","Humedad"};
+bool configInforme[numSensores] = {true,true,true,true};
+float medidasSensores[numSensores] = {20.1, 385.7, 1024.1, 12.6};
+char *infoSensores[]={"Temperatura","Luz","Presion","Humedad"};
 
- char unidades[4][10];
- char decimales[4][10];
+char unidades[4][10];
+char decimales[4][10];
 
-//*****************************************************************************
-
-//*****************************************************************************
-//
-// The delay count to reduce traffic to the weather server.
-//
-//*****************************************************************************
+//RELOJ y proridades de interrupcion
 volatile uint32_t g_ui32Delay;
-
-//*****************************************************************************
-//
-// Global to track number of times the app has cycled through the list of
-// cities.
-//
-//*****************************************************************************
-volatile uint32_t g_ui32Cycles;
-
-//*****************************************************************************
-//
-// The delay count to update the UART.
-//
-//*****************************************************************************
-uint32_t g_ui32UARTDelay;
-
-//*****************************************************************************
-//
-// System Clock rate in Hertz.
-//
-//*****************************************************************************
 uint32_t g_ui32SysClock;
 
-//*****************************************************************************
-//
-// Interrupt priority definitions.  The top 3 bits of these values are
-// significant with lower values indicating higher priority interrupts.
-//
-//*****************************************************************************
 #define SYSTICK_INT_PRIORITY    0x80
 #define ETHERNET_INT_PRIORITY   0xC0
 
-//*****************************************************************************
-//
-// MAC address.
-//
-//*****************************************************************************
+// DIRECCIONES
 char g_pcMACAddr[40];
-
-//*****************************************************************************
-//
-// IP address.
-//
-//*****************************************************************************
-
 uint32_t g_ui32IPaddr;
-
 char g_pcIPAddr[20];
 
 // UART
 uint16_t actualizarUART;
+uint32_t g_ui32UARTDelay;
 
-
-//*****************************************************************************
-//
-// Update the IP address string.
-//
-//*****************************************************************************
 void
 UpdateIPAddress(char *pcAddr, uint32_t ipAddr)
 {
@@ -261,7 +212,7 @@ int32_t i32Idx;
    ' ' ->%20
    '\n'->%0A
 */
-void separaDecimales(float *in, char unidade[][10], char decimale[][10], int N){
+void separaDecimales(float *in, char unidad[][10], char decimal[][10], int N){
     int i;
     int ud,dec;
 
@@ -271,9 +222,9 @@ void separaDecimales(float *in, char unidade[][10], char decimale[][10], int N){
         dec = (in[i]-ud)*100;
 
         sprintf(aux,"%d",ud);
-        strcpy(unidade[i],aux);
+        strcpy(unidad[i],aux);
         sprintf(aux,"%d",dec);
-        strcpy(decimale[i],aux);
+        strcpy(decimal[i],aux);
     }
 }
 
@@ -288,10 +239,6 @@ void informeSensores(char *nombreDisp ,char *cadenaOut, char *info[], char unMed
 
     for(i = 0; i < numeroMedidas; i++){
         if(config[i]){
-            UARTprintf("\n");
-            UARTprintf(unMedidas[i]);
-            UARTprintf(decMedidas[i]);
-            UARTprintf("|");
             strcat(cadenaOut,"%0A");
             strcat(cadenaOut,info[i]);
             strcat(cadenaOut,"%20");
@@ -325,25 +272,25 @@ main(void)
 
     PinoutSet(true, false);
 
-    //
-    // Initialize the UART.
+
+    // UART
     //
     UARTStdioConfig(0, 115200, g_ui32SysClock);
 
-    //
-    // Configure SysTick for a periodic interrupt at 10ms.
+
+    // Systick a 10 ms
     //
     SysTickPeriodSet((g_ui32SysClock / 1000) * SYSTEM_TICK_MS);
     SysTickEnable();
     SysTickIntEnable();
 
 
-    // Set the IP address to 0.0.0.0.
+    // Poner la IP a 0.0.0.0.
     //
     UpdateIPAddress(g_pcIPAddr, 0);
 
-    //
-    // Enable processor interrupts.
+
+    // Interrupciones
     //
     IntMasterEnable();
 
@@ -352,7 +299,7 @@ main(void)
     IntPrioritySet(FAULT_SYSTICK, SYSTICK_INT_PRIORITY);
 
 
-
+    // Inicializacion Ethernet
     EthClientProxySet(0,0);
 	EthClientInit(g_ui32SysClock,EnetEvents);
 
