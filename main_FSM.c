@@ -1,19 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h>
-#include "inc/hw_types.h"
-#include "inc/hw_ints.h"
-#include "inc/hw_memmap.h"
-#include "inc/hw_nvic.h"
-#include "inc/hw_gpio.h"
-#include "driverlib/flash.h"
-#include "driverlib/gpio.h"
-#include "driverlib/interrupt.h"
-#include "driverlib/pin_map.h"
-#include "driverlib/rom.h"
-#include "driverlib/rom_map.h"
-#include "driverlib/sysctl.h"
-#include "driverlib/systick.h"
-#include "driverlib/emac.h"
+#include "driverlib2.h"
 #include "drivers/pinout.h"
 #include "utils/cmdline.h"
 #include "utils/locator.h"
@@ -22,8 +9,22 @@
 #include "utils/uartstdio.h"
 #include "utils/ustdlib.h"
 #include "eth_client_lwip.h"
-#include "main.h"
 #include "string.h"
+
+
+#define SYSTEM_TICK_MS          10
+#define SYSTEM_TICK_S           100
+
+
+//*****************************************************************************
+//
+// Input command line buffer size.
+//
+//*****************************************************************************
+#define APP_INPUT_BUF_SIZE                  1024
+
+#define MAX_REQUEST_SIZE                    1024
+
 
 #define ETH_CLIENT_EVENT_DHCP          0x00000001
 #define ETH_CLIENT_EVENT_DISCONNECT    0x00000002
@@ -52,8 +53,6 @@ g_iState = STATE_NOT_CONNECTED;
 
 const char* stateName[] = {"NOT CONNECTED","NEW CONNECTION","IDLE","WAIT DATA","UPDATING","WAIT NEXT","WAIT FOR CONNECTION"};
 
-//const char* nombreDominio = "api.telegram.org";
-//const char* nombreDominio = "api.openweathermap.org";
 const char* nombreDominio = "httptohttps.mrtimcakes.com";
 uint16_t puertoConexion = 80;
 
@@ -66,7 +65,22 @@ const char* sendMessage = "sendMessage?chat_id=@";
 char* chatName = "sepaGIERM";
 const char* textHeader = "&text=";
 char* messageToSend;
-const char* endRequest =  "HTTP/1.1\r\nHost: httptohttps.mrtimcakes.com\r\nConnection: close\r\n\r\n";
+const char* endRequest =  " HTTP/1.1\r\nHost: httptohttps.mrtimcakes.com\r\nConnection: close\r\n\r\n";
+
+char myRequest[MAX_REQUEST_SIZE];
+char textoRequest[200];
+
+
+
+// Sensores e informe
+const int numSensores = 4;
+
+ bool configInforme[numSensores] = {true,true,true,true};
+ float medidasSensores[numSensores] = {20.1, 385.7, 1024.1, 12.6};
+ const char *infoSensores[]={"Temperatura","Luz","Presion","Humedad"};
+
+ char unidades[4][10];
+ char decimales[4][10];
 
 //*****************************************************************************
 
@@ -242,17 +256,66 @@ int32_t telegramIP;
 int32_t i32Idx;
 //*****************
 
-int makeRequest(char *text, char *finalRequest){
+
+/* URL ENCONDING
+   ' ' ->%20
+   '\n'->%0A
+*/
+void separaDecimales(float *in, char unidade[][10], char decimale[][10], int N){
+    int i;
+    int ud,dec;
+
+    for(i = 0; i < N; i++){
+        char aux[10];
+        ud = in[i];
+        dec = (in[i]-ud)*100;
+
+        sprintf(aux,"%d",ud);
+        strcpy(unidade[i],aux);
+        sprintf(aux,"%d",dec);
+        strcpy(decimale[i],aux);
+    }
+}
+
+
+void informeSensores(char *nombreDisp ,char *cadenaOut, char *info[], char unMedidas[][10], char decMedidas[][10], bool *config, int numeroMedidas){
+    //sprintf(cadenaOut,"----ENVIADO%20DESDE%20%s---%0A%0ATemperatura%5BC%5D%3A%20%f%0ALuz%3A%20%f%09%0APresion%3A%20%f%0AHumedad%20Rel.%3A%20%f",nombreDisp,temp,luz,presion,hum);
+    int i;
+
+    strcpy(cadenaOut,"--ENVIADO%20DESDE%20");
+    strcat(cadenaOut,nombreDisp);
+    strcat(cadenaOut,"%20--%0A");
+
+    for(i = 0; i < numeroMedidas; i++){
+        if(config[i]){
+            UARTprintf("\n");
+            UARTprintf(unMedidas[i]);
+            UARTprintf(decMedidas[i]);
+            UARTprintf("|");
+            strcat(cadenaOut,"%0A");
+            strcat(cadenaOut,info[i]);
+            strcat(cadenaOut,"%20");
+            strcat(cadenaOut,unidades[i]);
+            strcat(cadenaOut,"%2E");
+            strcat(cadenaOut,decimales[i]);
+        }
+    }
+
+}
+void copySt(char *in, char *out){
+    sprintf(out,"%s",in);
+}
+
+void makeRequest(char *text, char *finalRequest){
     sprintf(finalRequest,"GET /https://api.telegram.org/bot%s/sendMessage?chat_id=@%s&text=%s HTTP/1.1\r\nHost: httptohttps.mrtimcakes.com\r\nConnection: close\r\n\r\n",APIkey,chatName,text);
+    /*sprintf(finalRequest,"GET /https://api.telegram.org/bot%s/sendMessage?chat_id=@%s&text=",APIkey,chatName);
+    strcat(finalRequest,text);
+    strcat(finalRequest,endRequest);*/
 }
 
 int
 main(void)
 {
-
-    char myRequest[MAX_REQUEST_SIZE];
-    char *letter = "aver";
-
     SysCtlMOSCConfigSet(SYSCTL_MOSC_HIGHFREQ);
 
     g_ui32SysClock = MAP_SysCtlClockFreqSet((SYSCTL_XTAL_25MHZ |
@@ -330,10 +393,12 @@ main(void)
             g_ui32Delay = 1000; // 10 segundos
             g_iState = STATE_WAIT_DATA;
 
-            makeRequest(letter, myRequest);
+            separaDecimales(medidasSensores, unidades, decimales, 4);
+            informeSensores("MikeTIVA", textoRequest,infoSensores, unidades, decimales, configInforme, numSensores);
+            makeRequest(textoRequest, myRequest);
             resEnvio=EthClientSend(myRequest,sizeof(myRequest));
             //letter++;
-            UARTprintf("\n%s",myRequest);
+            //UARTprintf("\n%s",myRequest);
             //Debug
             if(!conexionTelegram)
                 UARTprintf("\n\n>Conexion TCP establecida");
@@ -368,7 +433,7 @@ main(void)
         }
 		else if(g_iState == STATE_NOT_CONNECTED){
 			conexionTelegram = EthClientTCPConnect();
-			g_iState = STATE_NEW_CONNECTION;
+			g_iState = STATE_WAIT_CONNECTION;
 			g_ui32Delay = 1000;
 			//SysCtlDelay(5000000);
 		}
