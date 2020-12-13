@@ -33,7 +33,7 @@
 //  CONFIGURACIÓN
 //
 
-#define BP_PANTALLA         2
+#define BP_PANTALLA         1
 #define NUMERO_SENSORES     4
 
 ////////////////////////////////////////////////
