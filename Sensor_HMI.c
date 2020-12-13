@@ -8,7 +8,10 @@
 #include "sensorlib2.h"
 #include <math.h>
 
-/*---Variables para el control de la pantalla---*/
+////////////////////////////////////////////////
+//  Variables para el control de la pantalla
+//
+
 char chipid = 0;                                // Holds value of Chip ID read from the FT800
 unsigned int CMD_Offset = 0;
 unsigned long cmdBufferRd = 0x00000000;         // Store the value read from the REG_CMD_READ register
@@ -18,7 +21,12 @@ const int32_t REG_CAL[6]={21696,-78,-614558,498,-17021,15755638};
 const int32_t REG_CAL5[6]={32146, -1428, -331110, -40, -18930, 18321010};
 unsigned long POSX, POSY, BufferXY;
 
-/*---Variables para el control de los sensores---*/
+////////////////////////////////////////////////
+
+////////////////////////////////////////////////
+//  Variables para el control de los sensores
+//
+
 uint8_t Sensor_OK=0;
 uint8_t Opt_OK, Bme_OK;
 
@@ -31,12 +39,16 @@ float T_act,P_act,H_act;
 
 //OPT
 float lux;
-int lux_i;
 
 //Vector Medidas
 float vectorMedidas[4];
 
-/*---Variables de control de la HMI---*/
+////////////////////////////////////////////////
+
+////////////////////////////////////////////////
+//  Variables de control de la HMI
+//
+
 int cursor = 0;                 //Posición del cursor dentro de la cadena
 char strTecl[2];                //Cadena para pintar el teclado
 char strConsMedidas[60];        //Cadena que muestra las variables de los sensores en la consola
@@ -49,21 +61,26 @@ const char teclado[4][10] = {{'1','2','3','4','5','6','7','8','9','0'},     //Te
 int flanco = 0;                 //Almacenará un numero que identificará el botón en el que acaba de haber un flanco
 bool mayuscAct=0;               //Bloqueo de mayusculas activado
 bool muestraCursor=0;           //Variable que debe cambiarse alternativamente para mostrar el parpadeo del cursor
-char strCons[51];               //Texto de la consola
+char strCons[52];               //Texto de la consola
 
-char strConsOutput[51]={""};    //Texto que sale de la consola cuando se presiona enter
+char strConsOutput[52]={""};    //Texto que sale de la consola cuando se presiona enter
 bool comandoEnviado = 0;        //Se queda a 1 cuando se pulsa enter
 
+////////////////////////////////////////////////
 
-/* ------FUNCIÓN DE CONFIGURACIÓN DE LOS SENSORES--------*/
+//*****************************************************************************
+//
+//  FUNCIÓN DE CONFIGURACIÓN DE LOS SENSORES
+//  frecReloj -> frecuencia configurada del reloj
+//
+//*****************************************************************************
+
 void configuraSensor(int frecReloj)
 {
     if(Detecta_BP(1))
         Conf_Boosterpack(1, frecReloj);
     else if(Detecta_BP(2))
         Conf_Boosterpack(2, frecReloj);
-    else
-        return 0;
 
     //OPT3001
     Sensor_OK=Test_I2C_Dir(OPT3001_SLAVE_ADDRESS);
@@ -90,38 +107,83 @@ void configuraSensor(int frecReloj)
         Bme_OK=1;
     }
 }
+//*****************************************************************************
+//
+//  FUNCIÓN DE CONFIGURACIÓN DE LA PANTALLA
+//  BP          -> Boosterpack de conexión
+//  frecReloj   -> Frecuencia de reloj configurada
+//
+//*****************************************************************************
 
-/*------FUNCIÓN DE CONFIGURACIÓN DE LA PANTALLA--------
- * BP    -> Boosterpack de conexión
- * RELOJ -> Frecuencia de reloj configurada
- */
 void configuraPantalla(int BP, int frecReloj)
 {
     int i;
     HAL_Init_SPI(BP, frecReloj);
     Inicia_pantalla();
     SysCtlDelay(frecReloj/3);
-    /*Calibración de la pantalla*/
+
+    //Calibración de la pantalla
+    //
 #ifdef VM800B35
     for(i=0;i<6;i++)    Esc_Reg(REG_TOUCH_TRANSFORM_A+4*i, REG_CAL[i]);
 #endif
 #ifdef VM800B50
     for(i=0;i<6;i++)    Esc_Reg(REG_TOUCH_TRANSFORM_A+4*i, REG_CAL5[i]);
 #endif
+
+    //Pintamos pantalla inicial
+    //
+    Nueva_pantalla(0x10,0x10,0x10); //Pantalla inicial de espera
+    ComColor(0x02,0x5E,0x80);
+
+    ComLineWidth(5);
+    Comando(CMD_BEGIN_RECTS);
+    ComVertex2ff(10,10);
+    ComVertex2ff(HSIZE-10,VSIZE-10);
+    ComColor(0x08,0x8E,0xC0);
+    ComVertex2ff(12,12);
+    ComVertex2ff(HSIZE-12,VSIZE-12);
+    Comando(CMD_END);
+
+    ComColor(0xff,0xff,0xff);
+    ComTXT(HSIZE/2,VSIZE/5, 22, OPT_CENTERX,"MONITORIZACION DE PROCESO VIA INTERNET");
+    ComTXT(HSIZE/2,50+VSIZE/5, 22, OPT_CENTERX," PROYECTO SEPA GIERM 2020 ");
+    ComTXT(HSIZE/2,100+VSIZE/5, 20, OPT_CENTERX,"MIGUEL GRANERO & DAVID TEJERO");
+    ComTXT(HSIZE/2,120+VSIZE/5, 20, OPT_CENTERX," Configurando IP y resolviendo DNS...");
+
+    Comando(CMD_BEGIN_LINES);
+    ComVertex2ff(40,40);
+    ComVertex2ff(HSIZE-40,40);
+    ComVertex2ff(HSIZE-40,40);
+    ComVertex2ff(HSIZE-40,VSIZE-40);
+    ComVertex2ff(HSIZE-40,VSIZE-40);
+    ComVertex2ff(40,VSIZE-40);
+    ComVertex2ff(40,VSIZE-40);
+    ComVertex2ff(40,40);
+    Comando(CMD_END);
+    Dibuja();
+
+    SysCtlDelay(frecReloj); //Mostramos el mensaje 1s
 }
 
-/*---------FUNCIÓN PARA LEER EL VALOR DE LOS SENSORES------*/
+//*****************************************************************************
+//
+//  FUNCIÓN PARA LEER EL VALOR DE LOS SENSORES
+//
+//*****************************************************************************
+
 void leeSensores(void)
 {
-    /*---LECTURA DE DATOS---*/
-    //OPT3000
+    //LECTURA DE DATOS
+    //  OPT3000
+    //
     if(Opt_OK)
     {
         lux=OPT3001_getLux();
-        lux_i=(int) round(lux);
     }
 
-    //BME280
+    //  BME280
+    //
     if(Bme_OK)
     {
         returnRslt = bme280_read_pressure_temperature_humidity(&g_u32ActualPress, &g_s32ActualTemp, &g_u32ActualHumity);
@@ -135,27 +197,30 @@ void leeSensores(void)
     vectorMedidas[3] = H_act;
 }
 
-
-/* ------- PINTAMOS Y EJECUTAMOS LA HMI -------
- *
- */
+//*****************************************************************************
+//
+//  FUNCIÓN PARA PINTAR Y EJECUTAR LA HMI
+//
+//*****************************************************************************
 
 void HMI (void)
 {
     int i,j;        //Índices
 
-    /*---PINTAMOS LA HMI---*/
-    //Pintamos la pantalla
+    //  Pintamos la pantalla
+    //
     Nueva_pantalla(0,0,0);
     ComLineWidth(1);
 
-    //Fondo+Marco
+    //  Fondo+Marco
+    //
     ComColor(0x7F,0xCC,0xA2);
     Comando(CMD_BEGIN_RECTS);
     ComVertex2ff(2,2);
     ComVertex2ff(HSIZE-2,VSIZE-2);
 
-    //Ventana de texto
+    //  Ventana de texto
+    //
     ComColor(0xFF,0xFF,0xFF);
     ComVertex2ff(3,3);
     ComVertex2ff(HSIZE-3,(VSIZE*3)/8);
@@ -175,7 +240,8 @@ void HMI (void)
 
     //Pintamos el teclado y vemos que teclas están pulsadas
 
-    //--Letras--
+    //  Letras
+    //
     ComColor(0x00,0x2B,0x38);
     ComFgcolor(0x96,0xB7,0xB5);
     indent=0;
@@ -207,9 +273,10 @@ void HMI (void)
         }
     }
 
-    //--Edición de texto y caracteres especiales--
+    //Edición de texto y caracteres especiales
 
-    //Espacio
+    //  Espacio
+    //
     if(Boton(6+3*(HSIZE/10-1),((VSIZE*3)/8+5)+(VSIZE/8-1)*4, 4*(HSIZE/10)-6, VSIZE/8-5, 21,"space"))
     {
         if (!flanco)
@@ -222,7 +289,8 @@ void HMI (void)
     else if (flanco==100)
         flanco = 0;
 
-    //Coma
+    //  Coma
+    //
     if(Boton(6+2*(HSIZE/10-1),((VSIZE*3)/8+5)+(VSIZE/8-1)*4, (HSIZE/10)-3, VSIZE/8-5, 21,","))
     {
         if (!flanco)
@@ -235,7 +303,8 @@ void HMI (void)
     else if (flanco==101)
         flanco = 0;
 
-    //Punto
+    //  Punto
+    //
     if(Boton(6+7*(HSIZE/10-1),((VSIZE*3)/8+5)+(VSIZE/8-1)*4, (HSIZE/10)-3, VSIZE/8-5, 21,"."))
     {
         if (!flanco)
@@ -249,7 +318,8 @@ void HMI (void)
     else if (flanco==102)
         flanco = 0;
 
-    //Mayusc
+    //  Mayusc
+    //
     if (mayuscAct)
         ComFgcolor(0x56,0x87,0x85);
     else
@@ -268,7 +338,8 @@ void HMI (void)
 
     ComFgcolor(0x96,0xB7,0xB5);
 
-    //Borrar
+    //  Borrar
+    //
     if (Boton(indent+6+8*(HSIZE/10-1),((VSIZE*3)/8+5)+(VSIZE/8-1)*3, HSIZE/10-3, VSIZE/8-5, 21,"<-"))
     {
         if (!flanco && cursor>0)
@@ -280,7 +351,8 @@ void HMI (void)
     else if (flanco==104)
         flanco = 0;
 
-    //Enter
+    //  Enter
+    //
     if (Boton(6+8*(HSIZE/10-1),((VSIZE*3)/8+5)+(VSIZE/8-1)*4, (3*(HSIZE/10))/2-3, VSIZE/8-5, 21,"ENTER"))
     {
         if (!flanco)
@@ -295,11 +367,9 @@ void HMI (void)
     else if (flanco==105)
         flanco = 0;
 
-
-    //--Texto Consola--
-    //Cursor
-    //El cursor no debe llegar a la posición final de la cadena o estaremos escribiendo el terminador final fuera
-    if (cursor>50)
+    //  Cursor
+    //
+    if (cursor>50)      //No podemos sobrepasar el cursor de la posición penúltima
         cursor=50;
 
     if (muestraCursor)
@@ -308,17 +378,23 @@ void HMI (void)
         strCons[cursor]=' ';
 
     strCons[cursor + 1]='\0';
+
+    //  Mostamos el texto por consola
+    //
     ComColor(0,0,0);
     ComTXT(HSIZE/32,VSIZE/4, 27, OPT_MONO,strCons);
 
-    //------MEDIDAS AMBIENTALES----------
+    //  Mostramos las medidas ambientales por pantalla
+    //
     if(Opt_OK && Bme_OK)
     {
         ComColor(0xA6,0x39,0x2C);
-        sprintf(strConsMedidas,"LUX: %d --- T:%.2f C --- P:%.2fmbar --- H:%.3f",lux_i,T_act,P_act,H_act);
+        sprintf(strConsMedidas,"LUX: %.2f --- T:%.2f C --- P:%.2fmbar --- H:%.3f",lux,T_act,P_act,H_act);
         ComTXT(HSIZE/2,VSIZE/16, 20, OPT_CENTER,strConsMedidas);
     }
 
+    //  Dibujamos toda la pantalla
+    //
     Dibuja();
 }
 

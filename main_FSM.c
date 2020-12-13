@@ -29,21 +29,20 @@
 #define ETH_CLIENT_EVENT_SEND          0x00000006
 #define ETH_CLIENT_EVENT_ERROR         0x00000007
 
-/////////////////////////////
-// CONFIGURACION
+////////////////////////////////////////////////
+//  CONFIGURACIÓN
 //
 
-#define BP_PANTALLA         1
+#define BP_PANTALLA         2
 #define NUMERO_SENSORES     4
 
-///////////////////////////
+////////////////////////////////////////////////
 
-
-/////////////////////////////
-// Conexion y variables de RED
+////////////////////////////////////////////////
+// CONEXIÓN Y VARIABLES DE RED
 //
 
-//Estados maquina estado internet
+//Estados de la máquina de estados de internet
 
 volatile enum
 {
@@ -58,7 +57,7 @@ volatile enum
 g_iState = STATE_NOT_CONNECTED;
 const char* stateName[] = {"NOT CONNECTED","NEW CONNECTION","IDLE","WAIT DATA","UPDATING","WAIT NEXT","WAIT FOR CONNECTION"};
 
-//Dominio, puerto y request de ejemplo
+//Dominio, puerto y request para la conexión con nuesta API
 
 const char* nombreDominio = "httptohttps.mrtimcakes.com";
 uint16_t puertoConexion = 80;
@@ -66,7 +65,7 @@ uint16_t puertoConexion = 80;
 int8_t g_exampleRequest[] =
         "GET /https://api.telegram.org/bot1435063235:AAHmzw5HcVKpZvCxf3kgwenqtsIXOHz167E/sendMessage?chat_id=@sepaGIERM&text=TIVAHEY HTTP/1.1\r\nHost: httptohttps.mrtimcakes.com\r\nConnection: close\r\n\r\n";
 
-//Partes Request
+//Partes que conforman el Request
 
 const char* requestHeader = "GET /https://api.telegram.org/bot";
 char* APIkey = "1435063235:AAHmzw5HcVKpZvCxf3kgwenqtsIXOHz167E";
@@ -78,10 +77,11 @@ const char* endRequest =  " HTTP/1.1\r\nHost: httptohttps.mrtimcakes.com\r\nConn
 
 char myRequest[MAX_REQUEST_SIZE];
 char textoRequest[200];
-///////////////////////////
 
-/////////////////////////////
-// Sensores e informe
+////////////////////////////////////////////////
+
+////////////////////////////////////////////////
+//  VARIABLES DE SENSORES Y DEL INFORME
 //
 
 bool configInforme[NUMERO_SENSORES] = {true,true,true,true};                      //Configuracion por defecto
@@ -91,59 +91,77 @@ char infoSensores[NUMERO_SENSORES][20]={"Temperatura","Luz","Presion","Humedad"}
 char nombreDispositivo[20] = "TIVA"; //Por defecto TIVA
 char unidades[NUMERO_SENSORES][10];
 char decimales[NUMERO_SENSORES][10];
-///////////////////////////
+int tiempoEntreMensajes = 500;      //Ciclos de 10 ms entre requests (por defecto 5s)
+////////////////////////////////////////////////
 
-/////////////////////////////
-// RELOJ y proridades de interrupcion
+////////////////////////////////////////////////
+//  RELOJ Y PRIORIDADES DE INTERRUPCIÓN
 //
+
 volatile uint32_t g_ui32Delay;
 uint32_t g_ui32SysClock;
 
 #define SYSTICK_INT_PRIORITY    0x80
 #define ETHERNET_INT_PRIORITY   0xC0
-/////////////////////////////
 
-/////////////////////////////
-// DIRECCIONES
+////////////////////////////////////////////////
+
+////////////////////////////////////////////////
+//  DIRECCIONES
 //
+
 char g_pcMACAddr[40];
 uint32_t g_ui32IPaddr;
 char g_pcIPAddr[20];
-///////////////////////////
 
-/////////////////////////////
-// UART
+////////////////////////////////////////////////
+
+////////////////////////////////////////////////
+//  UART
 //
+
 uint16_t actualizarUART;
 uint32_t g_ui32UARTDelay;
-///////////////////////////
 
-/////////////////////////////
-// Variables para el control temporal de la HMI
+////////////////////////////////////////////////
+
+////////////////////////////////////////////////
+// VARIABLES PARA EL CONTROL TEMPORAL DE LA HMI
 //
+
 int tAct=0,tCursor=0;
 bool actualizaHMI=1;
-///////////////////////////
 
-/////////////////////////////
-// Variables para el control de comandos del HMI
+////////////////////////////////////////////////
+
+////////////////////////////////////////////////
+// VARIABLES PARA EL CONTROL DE COMANDOS DE LA HMI
 //
+
 char comandoHMI[5];
 char parametrosHMI[10];
-///////////////////////////
 
-/////////////////////////////
-// Variables DEBUG
+////////////////////////////////////////////////
+
+////////////////////////////////////////////////
+// VARIABLES DEBUG
 //
+
 int32_t DNSResuleto;
 int32_t conexionTelegram;
 int32_t resEnvio;
 int32_t telegramIP;
 int32_t i32Idx;
-///////////////////////////
 
-void
-UpdateIPAddress(char *pcAddr, uint32_t ipAddr)
+////////////////////////////////////////////////
+
+//*****************************************************************************
+//
+//  FUNCIÓN QUE GUARDA EN UN STRING LA IP LOCAL
+//
+//*****************************************************************************
+
+void UpdateIPAddress(char *pcAddr, uint32_t ipAddr)
 {
     uint8_t *pui8Temp = (uint8_t *)&ipAddr;
 
@@ -158,14 +176,13 @@ UpdateIPAddress(char *pcAddr, uint32_t ipAddr)
     }
 }
 
+//*****************************************************************************
+//
+// ACTUALIZA LA DIRECCIÓN MAC
+//
+//*****************************************************************************
 
-//*****************************************************************************
-//
-// Update the MAC address string.
-//
-//*****************************************************************************
-void
-UpdateMACAddr(void)
+void UpdateMACAddr(void)
 {
     uint8_t pui8MACAddr[6];
 
@@ -178,43 +195,40 @@ UpdateMACAddr(void)
 
 //*****************************************************************************
 //
-// Print the IP address string.
+// ESCRIBE POR LA UART NUESTRA DIRECCIÓN IP
 //
 //*****************************************************************************
-void
-PrintIPAddress(char *pcAddr, uint32_t ipaddr)
+
+void PrintIPAddress(char *pcAddr, uint32_t ipaddr)
 {
     uint8_t *pui8Temp = (uint8_t *)&ipaddr;
 
-    //
-    // Convert the IP Address into a string.
-    //
     UARTprintf("%d.%d.%d.%d\n", pui8Temp[0], pui8Temp[1], pui8Temp[2],
                pui8Temp[3]);
 }
+
 //*****************************************************************************
 //
-// The interrupt handler for the SysTick interrupt.
+// FUNCIÓN HANDLER DE LAS INTERRUPCIONES SysTick (CADA 10 MS)
 //
 //*****************************************************************************
-void
-SysTickIntHandler(void) // Cada 10 ms
+
+void SysTickIntHandler(void)
 {
-    //
     // Call the lwIP timer handler.
-    //
     EthClientTick(SYSTEM_TICK_MS);
 
-    if(actualizarUART > 0) actualizarUART--;
-    //
-    // Handle the delay between accesses to the weather server.
-    //
+    //Timeout para actualizar la UART
+    if(actualizarUART > 0)
+        actualizarUART--;
+
+    //Variable para realizar timeout y delays en la conexión
     if(g_ui32Delay > 0)
     {
         g_ui32Delay--;
     }
 
-    /*Activamos un refesco de la pantalla cada 100 ms*/
+    //Refrescamos la pantalla cada 100 ms
     tAct++;
     if(tAct > 10)
     {
@@ -223,7 +237,7 @@ SysTickIntHandler(void) // Cada 10 ms
     }
 
 
-    /*Hacemos que el cursor de la pantalla aparezca y desaparezca cada 0.5s*/
+    //Hacemos que el cursor de la pantalla aparezca y desaparezca cada 0.5s
     tCursor++;
     if (tCursor > 50)
     {
@@ -234,11 +248,11 @@ SysTickIntHandler(void) // Cada 10 ms
 
 //*****************************************************************************
 //
-// Network events handler.
+// MANEJADOR DE INTERRUPCIONES DE LOS EVNETOS DE INTERNET
 //
 //*****************************************************************************
-void
-EnetEvents(uint32_t ui32Event, void *pvData, uint32_t ui32Param)
+
+void EnetEvents(uint32_t ui32Event, void *pvData, uint32_t ui32Param)
 {
     if(ui32Event == ETH_CLIENT_EVENT_CONNECT)
     {
@@ -253,14 +267,14 @@ EnetEvents(uint32_t ui32Event, void *pvData, uint32_t ui32Param)
 
         UpdateIPAddress(g_pcIPAddr, 0);
     }
-	else if(ui32Event == ETH_CLIENT_EVENT_SEND){
-		g_iState = STATE_UPDATE;
-	}
+    else if(ui32Event == ETH_CLIENT_EVENT_SEND){
+        g_iState = STATE_UPDATE;
+    }
 }
 
 //*****************************************************************************
 //
-// Separa un float en unidades y decimales (2 decimales de precision)
+//  SEPARA UN FLOAT EN UNIDADES Y DECIMALES (2 DEC DE PRECISIÓN)
 //
 //*****************************************************************************
 
@@ -282,17 +296,18 @@ void separaDecimales(float *in, char unidad[][10], char decimal[][10], int N){
 
 //*****************************************************************************
 //
-// Crea el informe de la lectura de los sensores - Condificacion URL
+//  CREA EL INFORME DE LA LECTURA DE LOS SENSORES - COFIFICACIÓN URL
 //
 //*****************************************************************************
 
-/* URL ENCONDING
-   ' ' ->%20
-   '\n'->%0A
-*/
 void informeSensores(char *nombreDisp ,char *cadenaOut, char info[][20], char unMedidas[NUMERO_SENSORES][], char decMedidas[NUMERO_SENSORES][], bool *config, int numeroMedidas){
-    //sprintf(cadenaOut,"----ENVIADO%20DESDE%20%s---%0A%0ATemperatura%5BC%5D%3A%20%f%0ALuz%3A%20%f%09%0APresion%3A%20%f%0AHumedad%20Rel.%3A%20%f",nombreDisp,temp,luz,presion,hum);
     int i;
+
+    //////////////////////
+    //  URL ENCONDING   //
+    //   ' ' ->%20      //
+    //   '\n'->%0A      //
+    //////////////////////
 
     strcpy(cadenaOut,"--ENVIADO%20DESDE%20");
     strcat(cadenaOut,nombreDisp);
@@ -313,7 +328,7 @@ void informeSensores(char *nombreDisp ,char *cadenaOut, char info[][20], char un
 
 //*****************************************************************************
 //
-// Hace la request HTTP 1.1 final para enviarla al servidor con el mensaje que queramos
+//  CONSTRUYE EL MENSAJE DE REQUEST HTTP 1.1 PERSONALIZADO
 //
 //*****************************************************************************
 
@@ -323,7 +338,7 @@ void makeRequest(char *text, char *finalRequest){
 
 //*****************************************************************************
 //
-// Actualiza vector de medidas
+//  ACTUALIZA EL VECTOR DE MEDIDAS
 //
 //*****************************************************************************
 
@@ -335,7 +350,7 @@ void actualizarMedidas(float *nuevosValores, float *arrayOut, int N){
 
 //*****************************************************************************
 //
-// Actualiza nombre dispositivo
+// ACTUALIZA EL NOMBRE DEL DISPOSITIVO
 //
 //*****************************************************************************
 
@@ -345,7 +360,7 @@ void actualizaNombreDisp(char *nuevoNombre, char *stringOut){
 
 //*****************************************************************************
 //
-// Cambia la cofiguracion de envio de medidas
+//  CAMBIA LA CONFIGURACIÓN DEL ENVÍO DE MEDIDAS
 //
 //*****************************************************************************
 
@@ -355,21 +370,20 @@ void cambiaConfig(bool nuevaConfig, bool *arrayOut, int opcion){
 
 //*****************************************************************************
 //
-// Cambia la cofiguracion de envio de medidas
+//  CAMBIA EL NOMBRE DE LOS PARÁMETROS
 //
 //*****************************************************************************
 
 void cambiaInfo(char *nuevaConfig, char arrayOut[][20], int opcion){
-    //arrayOut[opcion] = nuevaConfig;
     strcpy(arrayOut[opcion],nuevaConfig);
 }
 
+//*****************************************************************************
+//
+//  PARSER PARA LOS COMANDOS DEL TECLADO DE LA PANTALLA
+//
+//*****************************************************************************
 
-//*****************************************************************************
-//
-// Parser para los comandos del teclado de la pantalla
-//
-//*****************************************************************************
 int commandParser(char *buffer, char *orden, char *parametros){
     int resultado;
     resultado = sscanf(buffer,"%s %s",orden,parametros);
@@ -380,17 +394,18 @@ int commandParser(char *buffer, char *orden, char *parametros){
 
 //*****************************************************************************
 //
-// Procesado de comandos de la pantalla
+//  PROCESADO DE COMANDOS DE LA PANTALLA
 //
 //*****************************************************************************
+
 void commandAction(char *orden, char *parametros){
     int opcion;
     int valorBool;
     bool finalBool;
     char valorString[20];
-
     int res;
 
+    // INFO
     if(!strcmp(orden,"INFO")){
         res = sscanf(parametros,"%d,%s",&opcion,valorString);
         if(res){
@@ -399,6 +414,8 @@ void commandAction(char *orden, char *parametros){
         }
 
     }
+
+    // NAME
     else if(!strcmp(orden,"NAME")){
         res = sscanf(parametros,"%s",valorString);
         if(res){
@@ -407,6 +424,8 @@ void commandAction(char *orden, char *parametros){
         }
 
     }
+
+    // CONF
     else if(!strcmp(orden,"CONF")){
         res = sscanf(parametros,"%d,%d",&opcion, &valorBool);
         if(res){
@@ -415,13 +434,22 @@ void commandAction(char *orden, char *parametros){
             cambiaConfig(finalBool, configInforme, opcion);
         }
     }
+
+    //FREC
+    else if(!strcmp(orden,"FREC"))
+    {
+        res = sscanf(parametros,"%d",&opcion);
+        if(res){
+            UARTprintf("\n%d -> CAMBIADA FRECUENCIA A: %d S ",res,opcion);
+            tiempoEntreMensajes = 100*opcion;
+        }
+
+    }
 }
-
-
 
 //*****************************************************************************
 //
-// Main
+// MAIN
 //
 //*****************************************************************************
 
@@ -436,54 +464,61 @@ main(void)
             SYSCTL_USE_PLL |
             SYSCTL_CFG_VCO_240), 120000000);
 
-    /*Configuramos el sensor y la pantalla*/
+    //  Configuramos el sensor y la pantalla
+    //
     configuraSensor(g_ui32SysClock);
     configuraPantalla(BP_PANTALLA,g_ui32SysClock);    //Pantalla en el BoosterPack definido en la config
 
     PinoutSet(true, false);
 
-    // UART
+    //  UART
     //
     UARTStdioConfig(0, 115200, g_ui32SysClock);
     UARTprintf("\nINIT ");
 
-    // Systick a 10 ms
+    //  Systick a 10 ms
     //
     SysTickPeriodSet((g_ui32SysClock / 1000) * SYSTEM_TICK_MS);
     SysTickEnable();
     SysTickIntEnable();
 
 
-    // Poner la IP a 0.0.0.0.
+    //  Poner la IP a 0.0.0.0.
     //
     UpdateIPAddress(g_pcIPAddr, 0);
 
 
-    // Interrupciones
+    //  Interrupciones
     //
     IntMasterEnable();
-
     IntPriorityGroupingSet(4);
     IntPrioritySet(INT_EMAC0, ETHERNET_INT_PRIORITY);
     IntPrioritySet(FAULT_SYSTICK, SYSTICK_INT_PRIORITY);
 
 
-    // Inicializacion Ethernet
+    //  Inicializacion Ethernet
+    //
     EthClientProxySet(0,0);
-	EthClientInit(g_ui32SysClock,EnetEvents);
+    EthClientInit(g_ui32SysClock,EnetEvents);
 
+    //  Actualizamos la dirección MAC
+    //
     UpdateMACAddr();
 
+    //  Actualizamos la dirección IP
+    //
     do{
         g_ui32IPaddr = EthClientAddrGet();
         SysCtlDelay(50000);
     }while(g_ui32IPaddr == 0 || g_ui32IPaddr == 0xffffffff);
 
     UARTprintf("\n\n>Mi IP: ");
-    PrintIPAddress(0, g_ui32IPaddr); //IP Local ok
+    PrintIPAddress(0, g_ui32IPaddr);    //IP Local ok
 
-
+    //  Fijamos el servidor y resolvemos el DNS
+    //
     EthClientHostSet(nombreDominio, puertoConexion);
+
     do{
         DNSResuleto = EthClientDNSResolve();
         SysCtlDelay(50000);
@@ -491,11 +526,9 @@ main(void)
 
     telegramIP = EthClientServerAddrGet();
     UARTprintf("\n\n>Server IP: ");
-    PrintIPAddress(0, telegramIP); //IP Telegram ok
+    PrintIPAddress(0, telegramIP);      //IP Telegram ok
 
     actualizarUART = 50;
-
-
     messageToSend = "a";
 
     while(1)
@@ -506,7 +539,7 @@ main(void)
         }
         else if(g_iState == STATE_CONNECTED_IDLE)
         {
-            g_ui32Delay = 1000; // 10 segundos
+            g_ui32Delay = 1000; //  Timeout de 10s
             g_iState = STATE_WAIT_DATA;
 
             separaDecimales(medidasSensores, unidades, decimales, NUMERO_SENSORES);
@@ -514,7 +547,8 @@ main(void)
             makeRequest(textoRequest, myRequest);
             resEnvio=EthClientSend(myRequest,sizeof(myRequest));
 
-            //Debug
+            //  Debug
+            //
             UARTprintf("\n%s",myRequest);
             if(!conexionTelegram)
                 UARTprintf("\n\n>Conexion TCP establecida");
@@ -527,7 +561,7 @@ main(void)
             //Entraremos en este estado desde el manejador de eventos si todo sale bien
             g_iState = STATE_WAIT_NICE;
 
-            g_ui32Delay = 500; //5 segundos
+            g_ui32Delay = tiempoEntreMensajes;
         }
         else if(g_iState == STATE_WAIT_NICE)
         {
@@ -547,27 +581,28 @@ main(void)
                 g_iState = STATE_NOT_CONNECTED;
             }
         }
-		else if(g_iState == STATE_NOT_CONNECTED){
-			conexionTelegram = EthClientTCPConnect();
-			g_iState = STATE_WAIT_CONNECTION;
-			g_ui32Delay = 1000;
-			//SysCtlDelay(5000000);
-		}
-		else if(g_iState == STATE_WAIT_CONNECTION){
-		    if(g_ui32Delay == 0)
-		    {
-		        UARTprintf("\n\n>Ha habido algun fallo, cerramos la conexion");
-		        EthClientTCPDisconnect();
-		        g_iState = STATE_NOT_CONNECTED;
-		    }
-		}
+        else if(g_iState == STATE_NOT_CONNECTED){
+            conexionTelegram = EthClientTCPConnect();
+            g_iState = STATE_WAIT_CONNECTION;
+            g_ui32Delay = 1000;
+        }
+        else if(g_iState == STATE_WAIT_CONNECTION){
+            if(g_ui32Delay == 0)
+            {
+                UARTprintf("\n\n>Ha habido algun fallo, cerramos la conexion");
+                EthClientTCPDisconnect();
+                g_iState = STATE_NOT_CONNECTED;
+            }
+        }
 
         if(actualizarUART == 0){
             UARTprintf("\n\nESTADO: %s",stateName[g_iState]);
             actualizarUART = 50;
         }
 
-        /*---Leemos los sensores y actualizamos la pantalla---*/
+
+        //Leemos los sensores y actualizamos la pantalla
+        //
         if (actualizaHMI)
         {
             actualizaHMI = 0;
