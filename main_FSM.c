@@ -86,7 +86,7 @@ char textoRequest[200];
 
 bool configInforme[NUMERO_SENSORES] = {true,true,true,true};                      //Configuracion por defecto
 float medidasSensores[NUMERO_SENSORES] = {20.1, 385.7, 1024.1, 12.6};             //Valores por defecto (DEBUG)
-char *infoSensores[20]={"Temperatura","Luz","Presion","Humedad"}; //Nombre por defecto
+char infoSensores[NUMERO_SENSORES][20]={"Temperatura","Luz","Presion","Humedad"}; //Nombre por defecto
 
 char nombreDispositivo[20] = "TIVA"; //Por defecto TIVA
 char unidades[NUMERO_SENSORES][10];
@@ -290,7 +290,7 @@ void separaDecimales(float *in, char unidad[][10], char decimal[][10], int N){
    ' ' ->%20
    '\n'->%0A
 */
-void informeSensores(char *nombreDisp ,char *cadenaOut, char *info[], char unMedidas[NUMERO_SENSORES][], char decMedidas[NUMERO_SENSORES][], bool *config, int numeroMedidas){
+void informeSensores(char *nombreDisp ,char *cadenaOut, char info[][20], char unMedidas[NUMERO_SENSORES][], char decMedidas[NUMERO_SENSORES][], bool *config, int numeroMedidas){
     //sprintf(cadenaOut,"----ENVIADO%20DESDE%20%s---%0A%0ATemperatura%5BC%5D%3A%20%f%0ALuz%3A%20%f%09%0APresion%3A%20%f%0AHumedad%20Rel.%3A%20%f",nombreDisp,temp,luz,presion,hum);
     int i;
 
@@ -359,8 +359,9 @@ void cambiaConfig(bool nuevaConfig, bool *arrayOut, int opcion){
 //
 //*****************************************************************************
 
-void cambiaInfo(char *nuevaConfig, char *arrayOut[], int opcion){
-    arrayOut[opcion] = nuevaConfig;
+void cambiaInfo(char *nuevaConfig, char arrayOut[][20], int opcion){
+    //arrayOut[opcion] = nuevaConfig;
+    strcpy(arrayOut[opcion],nuevaConfig);
 }
 
 
@@ -407,11 +408,11 @@ void commandAction(char *orden, char *parametros){
 
     }
     else if(!strcmp(orden,"CONF")){
-        res = sscanf(parametros,"%d,%d",opcion, &valorBool);
+        res = sscanf(parametros,"%d,%d",&opcion, &valorBool);
         if(res){
             UARTprintf("\n%d -> CAMBIADA CONF[%d]: %d ",res,opcion,valorBool);
             finalBool = (valorBool != 0);
-            //cambiaConfig(finalBool, configInforme, opcion);
+            cambiaConfig(finalBool, configInforme, opcion);
         }
     }
 }
@@ -562,7 +563,7 @@ main(void)
 		}
 
         if(actualizarUART == 0){
-            //UARTprintf("\n\nESTADO: %s",stateName[g_iState]);
+            UARTprintf("\n\nESTADO: %s",stateName[g_iState]);
             actualizarUART = 50;
         }
 
