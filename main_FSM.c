@@ -17,14 +17,7 @@
 #define SYSTEM_TICK_MS          10
 #define SYSTEM_TICK_S           100
 
-
-//*****************************************************************************
-//
-// Input command line buffer size.
-//
-//*****************************************************************************
 #define APP_INPUT_BUF_SIZE                  1024
-
 #define MAX_REQUEST_SIZE                    1024
 
 
@@ -36,11 +29,22 @@
 #define ETH_CLIENT_EVENT_SEND          0x00000006
 #define ETH_CLIENT_EVENT_ERROR         0x00000007
 
-//*****************************************************************************
+/////////////////////////////
+// CONFIGURACION
 //
-// Connection states for weather application.
+
+#define BP_PANTALLA         1
+#define NUMERO_SENSORES     4
+
+///////////////////////////
+
+
+/////////////////////////////
+// Conexion y variables de RED
 //
-//*****************************************************************************
+
+//Estados maquina estado internet
+
 volatile enum
 {
     STATE_NOT_CONNECTED,
@@ -52,14 +56,17 @@ volatile enum
     STATE_WAIT_CONNECTION,
 }
 g_iState = STATE_NOT_CONNECTED;
-
 const char* stateName[] = {"NOT CONNECTED","NEW CONNECTION","IDLE","WAIT DATA","UPDATING","WAIT NEXT","WAIT FOR CONNECTION"};
+
+//Dominio, puerto y request de ejemplo
 
 const char* nombreDominio = "httptohttps.mrtimcakes.com";
 uint16_t puertoConexion = 80;
 
 int8_t g_exampleRequest[] =
         "GET /https://api.telegram.org/bot1435063235:AAHmzw5HcVKpZvCxf3kgwenqtsIXOHz167E/sendMessage?chat_id=@sepaGIERM&text=TIVAHEY HTTP/1.1\r\nHost: httptohttps.mrtimcakes.com\r\nConnection: close\r\n\r\n";
+
+//Partes Request
 
 const char* requestHeader = "GET /https://api.telegram.org/bot";
 char* APIkey = "1435063235:AAHmzw5HcVKpZvCxf3kgwenqtsIXOHz167E";
@@ -71,39 +78,69 @@ const char* endRequest =  " HTTP/1.1\r\nHost: httptohttps.mrtimcakes.com\r\nConn
 
 char myRequest[MAX_REQUEST_SIZE];
 char textoRequest[200];
+///////////////////////////
 
-
-
+/////////////////////////////
 // Sensores e informe
-const int numSensores = 4;
+//
 
-bool configInforme[numSensores] = {true,true,true,true};
-float medidasSensores[numSensores] = {20.1, 385.7, 1024.1, 12.6};
-char *infoSensores[]={"Temperatura","Luz","Presion","Humedad"};
+bool configInforme[NUMERO_SENSORES] = {true,true,true,true};                      //Configuracion por defecto
+float medidasSensores[NUMERO_SENSORES] = {20.1, 385.7, 1024.1, 12.6};             //Valores por defecto (DEBUG)
+char *infoSensores[20]={"Temperatura","Luz","Presion","Humedad"}; //Nombre por defecto
 
-char unidades[4][10];
-char decimales[4][10];
+char nombreDispositivo[20] = "TIVA"; //Por defecto TIVA
+char unidades[NUMERO_SENSORES][10];
+char decimales[NUMERO_SENSORES][10];
+///////////////////////////
 
-//RELOJ y proridades de interrupcion
+/////////////////////////////
+// RELOJ y proridades de interrupcion
+//
 volatile uint32_t g_ui32Delay;
 uint32_t g_ui32SysClock;
 
 #define SYSTICK_INT_PRIORITY    0x80
 #define ETHERNET_INT_PRIORITY   0xC0
+/////////////////////////////
 
+/////////////////////////////
 // DIRECCIONES
+//
 char g_pcMACAddr[40];
 uint32_t g_ui32IPaddr;
 char g_pcIPAddr[20];
+///////////////////////////
 
+/////////////////////////////
 // UART
+//
 uint16_t actualizarUART;
 uint32_t g_ui32UARTDelay;
+///////////////////////////
 
-//Variables para el control temporal de la HMI
+/////////////////////////////
+// Variables para el control temporal de la HMI
+//
 int tAct=0,tCursor=0;
 bool actualizaHMI=1;
+///////////////////////////
 
+/////////////////////////////
+// Variables para el control de comandos del HMI
+//
+char comandoHMI[5];
+char parametrosHMI[10];
+///////////////////////////
+
+/////////////////////////////
+// Variables DEBUG
+//
+int32_t DNSResuleto;
+int32_t conexionTelegram;
+int32_t resEnvio;
+int32_t telegramIP;
+int32_t i32Idx;
+///////////////////////////
 
 void
 UpdateIPAddress(char *pcAddr, uint32_t ipAddr)
@@ -221,20 +258,12 @@ EnetEvents(uint32_t ui32Event, void *pvData, uint32_t ui32Param)
 	}
 }
 
-// Variables DEBUG
+//*****************************************************************************
+//
+// Separa un float en unidades y decimales (2 decimales de precision)
+//
+//*****************************************************************************
 
-int32_t DNSResuleto;
-int32_t conexionTelegram;
-int32_t resEnvio;
-int32_t telegramIP;
-int32_t i32Idx;
-//*****************
-
-
-/* URL ENCONDING
-   ' ' ->%20
-   '\n'->%0A
-*/
 void separaDecimales(float *in, char unidad[][10], char decimal[][10], int N){
     int i;
     int ud,dec;
@@ -251,8 +280,17 @@ void separaDecimales(float *in, char unidad[][10], char decimal[][10], int N){
     }
 }
 
+//*****************************************************************************
+//
+// Crea el informe de la lectura de los sensores - Condificacion URL
+//
+//*****************************************************************************
 
-void informeSensores(char *nombreDisp ,char *cadenaOut, char *info[], char unMedidas[][10], char decMedidas[][10], bool *config, int numeroMedidas){
+/* URL ENCONDING
+   ' ' ->%20
+   '\n'->%0A
+*/
+void informeSensores(char *nombreDisp ,char *cadenaOut, char *info[], char unMedidas[NUMERO_SENSORES][], char decMedidas[NUMERO_SENSORES][], bool *config, int numeroMedidas){
     //sprintf(cadenaOut,"----ENVIADO%20DESDE%20%s---%0A%0ATemperatura%5BC%5D%3A%20%f%0ALuz%3A%20%f%09%0APresion%3A%20%f%0AHumedad%20Rel.%3A%20%f",nombreDisp,temp,luz,presion,hum);
     int i;
 
@@ -272,16 +310,119 @@ void informeSensores(char *nombreDisp ,char *cadenaOut, char *info[], char unMed
     }
 
 }
-void copySt(char *in, char *out){
-    sprintf(out,"%s",in);
-}
+
+//*****************************************************************************
+//
+// Hace la request HTTP 1.1 final para enviarla al servidor con el mensaje que queramos
+//
+//*****************************************************************************
 
 void makeRequest(char *text, char *finalRequest){
     sprintf(finalRequest,"GET /https://api.telegram.org/bot%s/sendMessage?chat_id=@%s&text=%s HTTP/1.1\r\nHost: httptohttps.mrtimcakes.com\r\nConnection: close\r\n\r\n",APIkey,chatName,text);
-    /*sprintf(finalRequest,"GET /https://api.telegram.org/bot%s/sendMessage?chat_id=@%s&text=",APIkey,chatName);
-    strcat(finalRequest,text);
-    strcat(finalRequest,endRequest);*/
 }
+
+//*****************************************************************************
+//
+// Actualiza vector de medidas
+//
+//*****************************************************************************
+
+void actualizarMedidas(float *nuevosValores, float *arrayOut, int N){
+    int i;
+    for(i = 0; i < N; i++) arrayOut[i] = nuevosValores[i];
+}
+
+
+//*****************************************************************************
+//
+// Actualiza nombre dispositivo
+//
+//*****************************************************************************
+
+void actualizaNombreDisp(char *nuevoNombre, char *stringOut){
+    strcpy(stringOut,nuevoNombre);
+}
+
+//*****************************************************************************
+//
+// Cambia la cofiguracion de envio de medidas
+//
+//*****************************************************************************
+
+void cambiaConfig(bool nuevaConfig, bool *arrayOut, int opcion){
+    arrayOut[opcion] = nuevaConfig;
+}
+
+//*****************************************************************************
+//
+// Cambia la cofiguracion de envio de medidas
+//
+//*****************************************************************************
+
+void cambiaInfo(char *nuevaConfig, char *arrayOut[], int opcion){
+    arrayOut[opcion] = nuevaConfig;
+}
+
+
+//*****************************************************************************
+//
+// Parser para los comandos del teclado de la pantalla
+//
+//*****************************************************************************
+int commandParser(char *buffer, char *orden, char *parametros){
+    int resultado;
+    resultado = sscanf(buffer,"%s %s",orden,parametros);
+    if(parametros[strlen(parametros-1)] == '_') parametros[strlen(parametros-1)] = '\0';
+    UARTprintf("\n%d -> ESCANEADO: %s %s",resultado,orden,parametros);
+    return resultado; //Si devuelve 2 significa que se ha parseado correctamente
+}
+
+//*****************************************************************************
+//
+// Procesado de comandos de la pantalla
+//
+//*****************************************************************************
+void commandAction(char *orden, char *parametros){
+    int opcion;
+    int valorBool;
+    bool finalBool;
+    char valorString[20];
+
+    int res;
+
+    if(!strcmp(orden,"INFO")){
+        res = sscanf(parametros,"%d,%s",&opcion,valorString);
+        if(res){
+            cambiaInfo(valorString, infoSensores, opcion);
+            UARTprintf("\n%d -> CAMBIADA INFO[%d]: %s ",res,opcion,valorString);
+        }
+
+    }
+    else if(!strcmp(orden,"NAME")){
+        res = sscanf(parametros,"%s",valorString);
+        if(res){
+            UARTprintf("\n%d -> CAMBIADO NOMBRE: %s ",res,valorString);
+            actualizaNombreDisp(valorString, nombreDispositivo);
+        }
+
+    }
+    else if(!strcmp(orden,"CONF")){
+        res = sscanf(parametros,"%d,%d",opcion, &valorBool);
+        if(res){
+            UARTprintf("\n%d -> CAMBIADA CONF[%d]: %d ",res,opcion,valorBool);
+            finalBool = (valorBool != 0);
+            //cambiaConfig(finalBool, configInforme, opcion);
+        }
+    }
+}
+
+
+
+//*****************************************************************************
+//
+// Main
+//
+//*****************************************************************************
 
 int
 main(void)
@@ -296,14 +437,14 @@ main(void)
 
     /*Configuramos el sensor y la pantalla*/
     configuraSensor(g_ui32SysClock);
-    configuraPantalla(2,g_ui32SysClock);    //Pantalla en el BoosterPack 2
+    configuraPantalla(BP_PANTALLA,g_ui32SysClock);    //Pantalla en el BoosterPack definido en la config
 
     PinoutSet(true, false);
 
     // UART
     //
     UARTStdioConfig(0, 115200, g_ui32SysClock);
-
+    UARTprintf("\nINIT ");
 
     // Systick a 10 ms
     //
@@ -367,13 +508,13 @@ main(void)
             g_ui32Delay = 1000; // 10 segundos
             g_iState = STATE_WAIT_DATA;
 
-            separaDecimales(medidasSensores, unidades, decimales, 4);
-            informeSensores("MikeTIVA", textoRequest,infoSensores, unidades, decimales, configInforme, numSensores);
+            separaDecimales(medidasSensores, unidades, decimales, NUMERO_SENSORES);
+            informeSensores(nombreDispositivo, textoRequest,infoSensores, unidades, decimales, configInforme, NUMERO_SENSORES);
             makeRequest(textoRequest, myRequest);
             resEnvio=EthClientSend(myRequest,sizeof(myRequest));
-            //letter++;
-            //UARTprintf("\n%s",myRequest);
+
             //Debug
+            UARTprintf("\n%s",myRequest);
             if(!conexionTelegram)
                 UARTprintf("\n\n>Conexion TCP establecida");
             if(!resEnvio)
@@ -421,7 +562,7 @@ main(void)
 		}
 
         if(actualizarUART == 0){
-            UARTprintf("\n\nESTADO: %s",stateName[g_iState]);
+            //UARTprintf("\n\nESTADO: %s",stateName[g_iState]);
             actualizarUART = 50;
         }
 
@@ -431,6 +572,12 @@ main(void)
             actualizaHMI = 0;
             leeSensores();
             HMI();
+            actualizarMedidas(vectorMedidas, medidasSensores, NUMERO_SENSORES);
+            if(comandoEnviado){
+                comandoEnviado = 0;
+                commandParser(strConsOutput, comandoHMI, parametrosHMI);
+                commandAction(comandoHMI, parametrosHMI);
+            }
         }
 
         SysCtlDelay(500);

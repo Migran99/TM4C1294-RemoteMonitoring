@@ -21,3 +21,5 @@ extern float T_act;                 //Temperatura medida
 extern float P_act;                 //Presión medida
 
 extern float H_act;                 //Humedad medida
+
+extern float vectorMedidas[4];

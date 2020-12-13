@@ -33,6 +33,9 @@ float T_act,P_act,H_act;
 float lux;
 int lux_i;
 
+//Vector Medidas
+float vectorMedidas[4];
+
 /*---Variables de control de la HMI---*/
 int cursor = 0;                 //Posición del cursor dentro de la cadena
 char strTecl[2];                //Cadena para pintar el teclado
@@ -126,6 +129,10 @@ void leeSensores(void)
         P_act=(float)g_u32ActualPress/100.0;
         H_act=(float)g_u32ActualHumity/1000.0;
     }
+    vectorMedidas[0] = T_act;
+    vectorMedidas[1] = lux;
+    vectorMedidas[2] = P_act;
+    vectorMedidas[3] = H_act;
 }
 
 
@@ -280,6 +287,7 @@ void HMI (void)
         {
             comandoEnviado=1;
             strcpy(strConsOutput,strCons);
+            strConsOutput[cursor] ='\0';
             cursor=0;
             flanco=105;
         }
