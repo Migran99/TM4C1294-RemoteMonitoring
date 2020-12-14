@@ -29,6 +29,6 @@ extern float P_act;                             //Presión medida
 
 extern float H_act;                             //Humedad medida
 
-extern float vectorMedidas[4];
+extern float vectorMedidas[4];                  //Vector de medidas. Para la composicion del informe
 
 ////////////////////////////////////////////////

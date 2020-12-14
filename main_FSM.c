@@ -13,7 +13,6 @@
 #include <stdio.h>
 #include "Sensor_HMI.h"
 
-
 #define SYSTEM_TICK_MS          10
 #define SYSTEM_TICK_S           100
 
@@ -33,8 +32,11 @@
 //  CONFIGURACIÓN
 //
 
-#define BP_PANTALLA         1
-#define NUMERO_SENSORES     4
+#define BP_PANTALLA         1 // BOOSTERPACK Pantalla
+
+#define NUMERO_SENSORES     4 // Numero de sensores que se van a monitorizar
+                              // Lo hemos hecho así con la idea de poder ajustar el codigo
+                              // a otro set de sensores más facilmente.
 
 ////////////////////////////////////////////////
 
@@ -44,7 +46,7 @@
 
 //Estados de la máquina de estados de internet
 
-volatile enum
+enum
 {
     STATE_NOT_CONNECTED,
     STATE_NEW_CONNECTION,
@@ -59,7 +61,8 @@ const char* stateName[] = {"NOT CONNECTED","NEW CONNECTION","IDLE","WAIT DATA","
 
 //Dominio, puerto y request para la conexión con nuesta API
 
-const char* nombreDominio = "httptohttps.mrtimcakes.com";
+const char* nombreDominio = "httptohttps.mrtimcakes.com"; // Telegram necesita HTTPS, utilizamos esta pagina intermedia para
+                                                          // la transformacion HTTP -> HTTPS
 uint16_t puertoConexion = 80;
 
 int8_t g_exampleRequest[] =
@@ -98,7 +101,7 @@ int tiempoEntreMensajes = 500;      //Ciclos de 10 ms entre requests (por defect
 //  RELOJ Y PRIORIDADES DE INTERRUPCIÓN
 //
 
-volatile uint32_t g_ui32Delay;
+uint32_t g_ui32Delay;
 uint32_t g_ui32SysClock;
 
 #define SYSTICK_INT_PRIORITY    0x80
@@ -151,7 +154,6 @@ int32_t DNSResuleto;
 int32_t conexionTelegram;
 int32_t resEnvio;
 int32_t telegramIP;
-int32_t i32Idx;
 
 ////////////////////////////////////////////////
 
@@ -254,12 +256,15 @@ void SysTickIntHandler(void)
 
 void EnetEvents(uint32_t ui32Event, void *pvData, uint32_t ui32Param)
 {
+    // Evento de conexión al endpoint.
     if(ui32Event == ETH_CLIENT_EVENT_CONNECT)
     {
         g_iState = STATE_NEW_CONNECTION;
 
         UpdateIPAddress(g_pcIPAddr, EthClientAddrGet());
     }
+
+    // Desconexión del endpoint.
     else if(ui32Event == ETH_CLIENT_EVENT_DISCONNECT)
     {
         g_iState = STATE_NOT_CONNECTED;
@@ -267,6 +272,8 @@ void EnetEvents(uint32_t ui32Event, void *pvData, uint32_t ui32Param)
 
         UpdateIPAddress(g_pcIPAddr, 0);
     }
+
+    // Recibimos el ACK de respuesta. Usamos TCP así que significa que el paquete se ha enviado correctamente.
     else if(ui32Event == ETH_CLIENT_EVENT_SEND){
         g_iState = STATE_UPDATE;
     }
@@ -307,6 +314,7 @@ void informeSensores(char *nombreDisp ,char *cadenaOut, char info[][20], char un
     //  URL ENCONDING   //
     //   ' ' ->%20      //
     //   '\n'->%0A      //
+    //   '.' ->%2E      //
     //////////////////////
 
     strcpy(cadenaOut,"--ENVIADO%20DESDE%20");
@@ -386,8 +394,11 @@ void cambiaInfo(char *nuevaConfig, char arrayOut[][20], int opcion){
 
 int commandParser(char *buffer, char *orden, char *parametros){
     int resultado;
-    resultado = sscanf(buffer,"%s %s",orden,parametros);
-    if(parametros[strlen(parametros-1)] == '_') parametros[strlen(parametros-1)] = '\0';
+
+    resultado = sscanf(buffer,"%s %s",orden,parametros); // Dividimos en comando y parametros
+
+    //if(parametros[strlen(parametros-1)] == '_') parametros[strlen(parametros-1)] = '\0';
+
     UARTprintf("\n%d -> ESCANEADO: %s %s",resultado,orden,parametros);
     return resultado; //Si devuelve 2 significa que se ha parseado correctamente
 }
@@ -406,7 +417,8 @@ void commandAction(char *orden, char *parametros){
     int res;
 
     // INFO
-    if(!strcmp(orden,"INFO")){
+    if(!strcmp(orden,"INFO")){ // Cambia el "nombre" de una medida. Eg: Temperatura, Luz, ...
+                               // INFO [Indice medida],[nueva info]
         res = sscanf(parametros,"%d,%s",&opcion,valorString);
         if(res){
             cambiaInfo(valorString, infoSensores, opcion);
@@ -416,7 +428,8 @@ void commandAction(char *orden, char *parametros){
     }
 
     // NAME
-    else if(!strcmp(orden,"NAME")){
+    else if(!strcmp(orden,"NAME")){ // Cambia el nombre del dispositivo
+                                    // NAME [nuevo nombre]
         res = sscanf(parametros,"%s",valorString);
         if(res){
             UARTprintf("\n%d -> CAMBIADO NOMBRE: %s ",res,valorString);
@@ -426,7 +439,8 @@ void commandAction(char *orden, char *parametros){
     }
 
     // CONF
-    else if(!strcmp(orden,"CONF")){
+    else if(!strcmp(orden,"CONF")){ // Cambia la configuracion del informe. Qué medidas enviar y cuales no
+                                    // CONF [Indice medida],[ON/OFF (1/0)]
         res = sscanf(parametros,"%d,%d",&opcion, &valorBool);
         if(res){
             UARTprintf("\n%d -> CAMBIADA CONF[%d]: %d ",res,opcion,valorBool);
@@ -436,8 +450,8 @@ void commandAction(char *orden, char *parametros){
     }
 
     //FREC
-    else if(!strcmp(orden,"FREC"))
-    {
+    else if(!strcmp(orden,"FREC")) { // Cambia la frecuencia de envio de informes
+                                     // FREC [frecuencia]
         res = sscanf(parametros,"%d",&opcion);
         if(res){
             UARTprintf("\n%d -> CAMBIADA FRECUENCIA A: %d S ",res,opcion);
@@ -462,7 +476,7 @@ main(void)
     g_ui32SysClock = MAP_SysCtlClockFreqSet((SYSCTL_XTAL_25MHZ |
             SYSCTL_OSC_MAIN |
             SYSCTL_USE_PLL |
-            SYSCTL_CFG_VCO_240), 120000000);
+            SYSCTL_CFG_VCO_480), 120000000);
 
     //  Configuramos el sensor y la pantalla
     //
@@ -501,19 +515,22 @@ main(void)
     EthClientProxySet(0,0);
     EthClientInit(g_ui32SysClock,EnetEvents);
 
+
     //  Actualizamos la dirección MAC
     //
     UpdateMACAddr();
+
 
     //  Actualizamos la dirección IP
     //
     do{
         g_ui32IPaddr = EthClientAddrGet();
         SysCtlDelay(50000);
-    }while(g_ui32IPaddr == 0 || g_ui32IPaddr == 0xffffffff);
+    }while(g_ui32IPaddr == 0 || g_ui32IPaddr == 0xffffffff); // Debemos esperar hasta recibir IP buena
 
     UARTprintf("\n\n>Mi IP: ");
     PrintIPAddress(0, g_ui32IPaddr);    //IP Local ok
+
 
     //  Fijamos el servidor y resolvemos el DNS
     //
@@ -522,15 +539,28 @@ main(void)
     do{
         DNSResuleto = EthClientDNSResolve();
         SysCtlDelay(50000);
-    }while(DNSResuleto != 0);
+    }while(DNSResuleto != 0); // De nuevo esperaamos a que se resuelva
 
     telegramIP = EthClientServerAddrGet();
     UARTprintf("\n\n>Server IP: ");
     PrintIPAddress(0, telegramIP);      //IP Telegram ok
 
-    actualizarUART = 50;
-    messageToSend = "a";
 
+    //  Inicializamos el contador para la actualización de la UART
+    //
+    actualizarUART = 50;
+
+
+    // Configuramos el modo bajo consumo
+    //
+    SysCtlPeripheralClockGating(true);
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_EMAC0);
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_EPHY0);
+    SysCtlPeripheralSleepEnable(SYSCTL_PERIPH_UART0);
+
+
+    // Bucle infinito principal
+    //
     while(1)
     {
         if(g_iState == STATE_NEW_CONNECTION)
@@ -542,9 +572,14 @@ main(void)
             g_ui32Delay = 1000; //  Timeout de 10s
             g_iState = STATE_WAIT_DATA;
 
+            // Preparamos envio de REQUEST a telegram
+            //
             separaDecimales(medidasSensores, unidades, decimales, NUMERO_SENSORES);
             informeSensores(nombreDispositivo, textoRequest,infoSensores, unidades, decimales, configInforme, NUMERO_SENSORES);
             makeRequest(textoRequest, myRequest);
+
+            // Realizamos el envío
+            //
             resEnvio=EthClientSend(myRequest,sizeof(myRequest));
 
             //  Debug
@@ -558,14 +593,14 @@ main(void)
         }
         else if(g_iState == STATE_UPDATE)
         {
-            //Entraremos en este estado desde el manejador de eventos si todo sale bien
+            // Entraremos en este estado desde el manejador de eventos si todo sale bien
             g_iState = STATE_WAIT_NICE;
-
+            // Inicializamos el delay de espera entre mensajes
             g_ui32Delay = tiempoEntreMensajes;
         }
         else if(g_iState == STATE_WAIT_NICE)
         {
-            if(g_ui32Delay == 0)
+            if(g_ui32Delay == 0) // Hasta que no haya pasado el tiempo de espera no hacemos nada
             {
                 EthClientTCPDisconnect();
                 g_iState = STATE_NOT_CONNECTED;
@@ -574,19 +609,19 @@ main(void)
         else if(g_iState == STATE_WAIT_DATA)
         {
 
-            if(g_ui32Delay == 0)
+            if(g_ui32Delay == 0) // Esperamos ACK, si hay timeout desconectamos
             {
                 UARTprintf("\n\n>Ha habido algun fallo, cerramos la conexion");
                 EthClientTCPDisconnect();
                 g_iState = STATE_NOT_CONNECTED;
             }
         }
-        else if(g_iState == STATE_NOT_CONNECTED){
+        else if(g_iState == STATE_NOT_CONNECTED){ // Intentamos conectar y vamos a estado de espera
             conexionTelegram = EthClientTCPConnect();
             g_iState = STATE_WAIT_CONNECTION;
             g_ui32Delay = 1000;
         }
-        else if(g_iState == STATE_WAIT_CONNECTION){
+        else if(g_iState == STATE_WAIT_CONNECTION){ // Esperamos conexion hasta timeout
             if(g_ui32Delay == 0)
             {
                 UARTprintf("\n\n>Ha habido algun fallo, cerramos la conexion");
@@ -595,7 +630,7 @@ main(void)
             }
         }
 
-        if(actualizarUART == 0){
+        if(actualizarUART == 0){ // Actualizamos la UART
             UARTprintf("\n\nESTADO: %s",stateName[g_iState]);
             actualizarUART = 50;
         }
@@ -610,13 +645,16 @@ main(void)
             HMI();
             actualizarMedidas(vectorMedidas, medidasSensores, NUMERO_SENSORES);
             if(comandoEnviado){
+                // Procesamos el comando recibido
+                //
                 comandoEnviado = 0;
                 commandParser(strConsOutput, comandoHMI, parametrosHMI);
                 commandAction(comandoHMI, parametrosHMI);
             }
         }
 
-        SysCtlDelay(500);
+        //SysCtlDelay(500);
+        SysCtlSleep();
     }
 }
 

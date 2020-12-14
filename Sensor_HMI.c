@@ -133,7 +133,7 @@ void configuraPantalla(int BP, int frecReloj)
 
     //Pintamos pantalla inicial
     //
-    Nueva_pantalla(0x10,0x10,0x10); //Pantalla inicial de espera
+    Nueva_pantalla(0x10,0x10,0x10);
     ComColor(0x02,0x5E,0x80);
 
     ComLineWidth(5);
@@ -192,6 +192,8 @@ void leeSensores(void)
         P_act=(float)g_u32ActualPress/100.0;
         H_act=(float)g_u32ActualHumity/1000.0;
     }
+    // Guardamos en el vector de medidas
+    //
     vectorMedidas[0] = T_act;
     vectorMedidas[1] = lux;
     vectorMedidas[2] = P_act;
